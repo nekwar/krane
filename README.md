@@ -5,7 +5,7 @@
 ![Stability:Beta](https://img.shields.io/badge/stability-beta-orange)
 ![CircleCI](https://img.shields.io/circleci/build/github/appvia/krane/master)
 [![GitHub tag (latest SemVer)](https://img.shields.io/github/v/release/appvia/krane)](https://github.com/appvia/krane/releases/latest)
-![License: Apache-2.0](https://img.shields.io/github/license/appvia/krane)
+![License: Apache-2.0](https://img.shields.io/github/license/appvia/kore)
 ![Docker Repository on Quay.io](https://img.shields.io/badge/container-ready-brightgreen)
 
 _Krane_ is a simple Kubernetes RBAC static analysis tool. It identifies potential security risks in K8s RBAC design and makes suggestions on how to mitigate them. _Krane_ dashboard presents current RBAC security posture and lets you navigate through its definition.
@@ -24,7 +24,7 @@ _Krane_ is a simple Kubernetes RBAC static analysis tool. It identifies potentia
 
 ## Contents
 
-- [Quick Start](#quick-start)
+- [Local Quick Start](#local-quick-start)
 - [Usage Guide](#usage-guide)
 - [Architecture](#architecture)
 - [Kubernetes Deployment](#kubernetes-deployment)
@@ -35,25 +35,15 @@ _Krane_ is a simple Kubernetes RBAC static analysis tool. It identifies potentia
 - [Roadmap](#roadmap)
 - [License](#license)
 
-## Quick Start
+## Local Quick Start
 
-You can get started with Krane by installing it via Helm chart in your target Kubernetes cluster or running it locally with Docker.
+Get started locally with Docker Compose.
 
-### Install Helm chart
-
-It is assumed that you have [Helm CLI](https://helm.sh/docs/intro/install/) installed on your machine.
-
-```sh
-$ helm repo add appvia https://appvia.github.io/krane
-$ helm repo update
-$ helm install krane appvia/krane --namespace krane --create-namespace
-```
-
-Follow Helm chart installation output on how to port-forward Krane dashboard.
-
-### Run with Docker
+### Prerequisites
 
 It is assumed that you have [docker](https://docs.docker.com/get-docker/) running on your local machine. Install [docker-compose](https://docs.docker.com/compose/install/#install-compose) if you haven't already.
+
+### Run Krane locally
 
 Krane depends on RedisGraph. `docker-compose` stack defines all what's required to build and run _Krane_ service locally. It'll also take care of its [RedisGraph](https://oss.redislabs.com/redisgraph/) dependency.
 
@@ -65,14 +55,14 @@ _Krane_ docker image will be pre-built automatically if not already present on l
 
 Note that when running `docker-compose` locally, _Krane_ won't start RBAC _report_ and _dashboard_ automatically. Instead, the container will sleep for 24h by default - this value can be adjusted in `docker-compose.override.yml`. Exec into a running _Krane_ container to run commands. Local `docker-compose` will also mount kube config (`~/.kube/config`) inside the container enabling you to run reports against any Kubernetes clusters to which you already have access to.
 
-Exec into a running Krane container.
 ```sh
-docker-compose exec krane bash
-```
+# Exec into a running Krane container
 
-Once in the container you can start using `krane` commands. Try `krane -help`.
-```sh
-krane -h
+docker-compose exec krane bash
+
+# Once in the container you can start using `krane` commands. Try `krane -help`.
+
+$ krane -h
 ```
 
 To inspect what services are running and the associated ports:
@@ -145,13 +135,6 @@ NOTE: _Krane_ expects the following files (in either YAML or JSON format) to be 
   - clusterroles
   - rolebindings
   - clusterrolebindings
-
-If Pod Security Policies are not in use you may bypass the expectation above by creating a `psp` file manually with the following content:
-```json
-{
-  "items": []
-}
-```
 
 #### Inside a Kubernetes cluster
 
@@ -434,50 +417,9 @@ You may control certain aspects of in-cluster execution with the following envir
 
 ### Local or Remote K8s Cluster
 
-#### Helm Chart
-
-Before we begin, you'll need the following tools:
-* [Helm CLI](https://helm.sh/docs/intro/install/)
-
-Install helm chart:
-```sh
-$ helm repo add appvia https://appvia.github.io/krane
-$ helm repo update
-$ helm install krane appvia/krane --namespace krane --create-namespace
-```
-
-See [values.yaml](charts/krane/values.yaml) file for details of other settable options and parameters.
-
-#### K8s manifests
-
-```sh
-kubectl create \
-  --context <docker-desktop> \
-  --namespace krane \
-  -f k8s/redisgraph-service.yaml \
-  -f k8s/redisgraph-deployment.yaml \
-  -f k8s/krane-service.yaml \
-  -f k8s/krane-deployment.yaml
-```
-
-Note that _Krane_ dashboard service is not exposed by default!
-```sh
-kubectl port-forward svc/krane 8000 \
-  --context=<docker-desktop> \
-  --namespace=krane
-
-# Open Krane dashboard at http://localhost:8000
-```
-
-You can find the example deployment manifests in [k8s](k8s/) directory.
-
-Modify manifests as required for your deployments making sure you reference the correct version of _Krane_ docker image in its [deployment file](k8s/krane-deployment.yml). See [Krane Docker Registry](https://quay.io/repository/appvia/krane?tab=tags) for available tags, or just use `latest`.
-
-#### Compose-on-Kubernetes
-
 If your K8s cluster comes with built-in [Compose-on-Kubernetes](https://github.com/docker/compose-on-kubernetes) controller support (`docker-desktop` supports it by default), then you can deploy _Krane_ and its dependencies with a single [docker stack](https://docs.docker.com/engine/reference/commandline/stack_deploy/) command:
 
-```sh
+```
 docker stack deploy \
   --orchestrator kubernetes \
   --namespace krane \
@@ -489,30 +431,58 @@ Note: Make sure your current kube context is set correctly prior to running the 
 
 The application Stack should be now deployed to a Kubernetes cluster and all services ready and exposed. Note that _Krane_ will automatically start its report loop and dashboard server.
 
-```sh
-docker stack services --orchestrator kubernetes --namespace krane krane
 ```
+$ docker stack services --orchestrator kubernetes --namespace krane krane
 
-Command above will produce the following output:
-```
 ID                  NAME                MODE                REPLICAS            IMAGE                         PORTS
 0de30651-dd5        krane_redisgraph    replicated          1/1                 redislabs/redisgraph:1.99.7   *:6379->6379/tcp
 aa377a5f-62b        krane_krane         replicated          1/1                 quay.io/appvia/krane:latest   *:8000->8000/tcp
 ```
 
-Check your Kubernetes cluster RBAC security posture by visiting http://localhost:8000.
+Check your Kubernetes cluster RBAC security posture by visiting
+```
+http://localhost:8000
+```
 
 Note that for remote cluster deployments you'll likely need to port-forward _Krane_ service first
-```sh
+```
 kubectl --context=my-remote-cluster --namespace=krane port-forward svc/krane 8000
 ```
 
 To delete the Stack
-```sh
+```
 docker stack rm krane \
   --orchestrator kubernetes \
   --namespace krane
 ```
+
+Alternatively, deploy with [kubectl](https://kubectl.docs.kubernetes.io/):
+
+```
+kubectl create \
+  --context docker-desktop \
+  --namespace krane \
+  -f k8s/redisgraph-service.yaml \
+  -f k8s/redisgraph-deployment.yaml \
+  -f k8s/krane-service.yaml \
+  -f k8s/krane-deployment.yaml
+```
+
+Note that _Krane_ dashboard services are not exposed by default!
+```sh
+kubectl port-forward svc/krane 8000 \
+  --context=docker-desktop \
+  --namespace=krane
+
+# Open Krane dashboard
+
+http://localhost:8000
+```
+
+You can find the example deployment manifests in [k8s](k8s/) directory.
+
+Modify manifests as required for your deployments making sure you reference the correct version of _Krane_ docker image in its [deployment file](k8s/krane-deployment.yml). See [Krane Docker Registry](https://quay.io/repository/appvia/krane?tab=tags) for available tags, or just use `latest`.
+
 ## Notifications
 
 Krane will notify you about detected anomalies of medium and high severity via its Slack integration.
@@ -526,7 +496,7 @@ This section describes steps to enable local development.
 ### Setup
 
 Install _Krane_ code dependencies with
-```sh
+```
 ./bin/setup
 ```
 
@@ -534,17 +504,17 @@ Install _Krane_ code dependencies with
 
 _Krane_ depends on [RedisGraph](https://oss.redislabs.com/redisgraph/). `docker-compose` is the quickest way to get _Krane_'s dependencies running locally.
 
-```sh
+```
 docker-compose up -d redisgraph
 ```
 
 To inspect RedisGraph service is up:
-```sh
+```
 docker-compose ps
 ```
 
 To stop services:
-```sh
+```
 docker-compose down
 ```
 
@@ -553,17 +523,17 @@ docker-compose down
 At this point you should be able to modify _Krane_ codebase and test results by invoking commands in local shell.
 
 ```sh
-$ ./bin/krane --help                    # to get help
-$ ./bin/krane report -k docker-desktop  # to generate your first report for
-                                        # local docker-desktop k8s cluster
+./bin/krane --help                    # to get help
+./bin/krane report -k docker-desktop  # to generate your first report for
+                                      # local docker-desktop k8s cluster
 ...
 ```
 
 To enable Dashboard UI local development mode
-```sh
-$ cd dashboard
-$ npm install
-$ npm start
+```
+cd dashboard
+npm install
+npm start
 ```
 
 This will automatically start the Dashboard server, open default browser and watch for source files changes.
@@ -571,14 +541,14 @@ This will automatically start the Dashboard server, open default browser and wat
 _Krane_ comes preconfigured for improved developer experience with [Skaffold](https://skaffold.dev/). Iterating on the project and validating the application by running the entire stack in local or remote Kubernetes cluster just got easier.
 Code hot-reload enables local changes to be automatically propagated to the running container for faster development lifecycle.
 
-```sh
+```
 skaffold dev --kube-context docker-desktop --namespace krane --port-forward
 ```
 
 ### Tests
 
 Run tests locally with
-```sh
+```
 bundle exec rspec
 ```
 
